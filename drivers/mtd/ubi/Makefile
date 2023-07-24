@@ -8,3 +8,4 @@ obj-$(CONFIG_MTD_UBI_FASTMAP) += fastmap.o
 obj-y += misc.o
 obj-y += debug.o
 obj-$(CONFIG_UBI_BLOCK) += block.o part.o
+obj-$(CONFIG_DM_MTD) += ubi-uclass.o
