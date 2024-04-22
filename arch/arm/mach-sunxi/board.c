@@ -29,6 +29,8 @@
 
 #include <linux/compiler.h>
 
+int tp_board_init(void);
+
 struct fel_stash {
 	uint32_t sp;
 	uint32_t lr;
@@ -468,6 +470,16 @@ u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 	return result;
 }
 
+static void go_to_fel(void)
+{
+	/* change lr to the well-known fel entry point */
+	fel_stash.lr &= ~0xFFFF;
+	fel_stash.lr |= 0x0020;
+
+	debug("Entering FEL sp=%x, lr=%x\n", fel_stash.sp, fel_stash.lr);
+	return_to_fel(fel_stash.sp, fel_stash.lr);
+}
+
 void board_init_f(ulong dummy)
 {
 	sunxi_sram_init();
@@ -491,7 +503,10 @@ void board_init_f(ulong dummy)
 	i2c_init_board();
 	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
+
 	sunxi_board_init();
+	if (tp_board_init() == 1)
+		go_to_fel();
 }
 #endif /* CONFIG_XPL_BUILD */
 
