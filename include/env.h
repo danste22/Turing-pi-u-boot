@@ -159,6 +159,7 @@ bool env_get_autostart(void);
  * Return: 0 if OK, 1 on error
  */
 int env_set(const char *varname, const char *value);
+int env_set_force(const char *varname, const char *value);
 
 /**
  * env_get_ulong() - Return an environment variable as an integer value

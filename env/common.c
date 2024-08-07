@@ -152,6 +152,21 @@ int env_set(const char *varname, const char *varvalue)
 		return env_do_env_set(0, 3, (char * const *)argv, H_PROGRAMMATIC);
 }
 
+int env_set_force(const char *varname, const char *varvalue)
+{
+	const char * const argv[4] = { "setenv", varname, varvalue, NULL };
+
+	if (!(gd->flags & GD_FLG_ENV_READY))
+		return 1;
+
+	if (varvalue == NULL || varvalue[0] == '\0')
+		return env_do_env_set(0, 2, (char * const *)argv,
+				      H_PROGRAMMATIC | H_FORCE);
+	else
+		return env_do_env_set(0, 3, (char * const *)argv,
+				      H_PROGRAMMATIC | H_FORCE);
+}
+
 /**
  * Set an environment variable to an integer value
  *
@@ -207,12 +222,9 @@ int eth_env_set_enetaddr(const char *name, const uint8_t *enetaddr)
 {
 	char buf[ARP_HLEN_ASCII + 1];
 
-	if (eth_env_get_enetaddr(name, (uint8_t *)buf))
-		return -EEXIST;
-
 	sprintf(buf, "%pM", enetaddr);
 
-	return env_set(name, buf);
+	return env_set_force(name, buf);
 }
 
 /*
