@@ -2,6 +2,7 @@
 
 #include <asm/io.h>
 #include <asm/arch/cpu.h>
+//#include <asm/arch/clock_sun50i_h6.h>
 #include <asm/arch/clock.h>
 #include <asm/arch/prcm.h>
 #include <linux/delay.h>

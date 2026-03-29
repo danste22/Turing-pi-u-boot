@@ -7,7 +7,6 @@
 
 #define LOG_CATEGORY UCLASS_UBI
 
-#include <common.h>
 #include <blk.h>
 #include <dm.h>
 #include <dm/device-internal.h>
@@ -113,8 +112,8 @@ static int ubi_post_bind(struct udevice *dev)
 		pr_debug("UBI volume %d (\"%s\"): %lu blocks, %d bytes each\n",
 			 vol->vol_id, vol->name, lba, blksz);
 
-		ret = blk_create_device(dev, "ubi_block", vol->name, UCLASS_UBI,
-					vol->vol_id, blksz, lba, &blkdev);
+		ret = blk_create_devicef(dev, "ubi_block", vol->name, UCLASS_UBI,
+					 vol->vol_id, blksz, lba, &blkdev);
 		if (ret)
 			return ret;
 	}

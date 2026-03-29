@@ -10,11 +10,13 @@
 #include <asm/io.h>
 #include <bloblist.h>
 #include <board_info.h>
-#include <common.h>
 #include <dm.h>
 #include <i2c.h>
 #include <init.h>
+//#include <linux/errno.h>
 #include <linux/delay.h>
+//#include <log.h>
+//#include <stdio.h>
 #include <sunxi_gpio.h>
 #include <u-boot/crc.h>
 

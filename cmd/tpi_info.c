@@ -5,11 +5,11 @@
  */
 
 #include <stdio.h>
+#include <vsprintf.h>
 
 #include <bloblist.h>
 #include <board_info.h>
 #include <command.h>
-#include <common.h>
 #include <env.h>
 
 // Returns the semver version pointed to by `version_ptr` as a char*, prefixed

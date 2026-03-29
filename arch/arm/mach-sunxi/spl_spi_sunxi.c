@@ -498,10 +498,7 @@ static int spl_spi_load_image(struct spl_image_info *spl_image,
 
 	load_offset = max_t(uint32_t, load_offset, CONFIG_SYS_SPI_U_BOOT_OFFS);
 
-	load.dev = NULL;
-	load.priv = NULL;
-	load.filename = NULL;
-	load.bl_len = 1;
+	spl_load_init(&load, NULL, NULL, 1);
 
 	spi0_init();
 
