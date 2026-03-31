@@ -4,4 +4,4 @@
 # (C) Copyright 2024 sven@turingpi.com
 #
 obj-y += turingpi2-spl.o
-ccflags-y += -Iboard/turing/pi2/
+ccflags-y += -Iboard/tp2bmc/

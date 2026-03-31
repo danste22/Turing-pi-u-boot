@@ -13,4 +13,4 @@ obj-$(CONFIG_MACH_SUN5I)	+= dram_sun5i_auto.o
 obj-$(CONFIG_MACH_SUN7I)	+= dram_sun5i_auto.o
 obj-$(CONFIG_$(PHASE_)CHIP_DIP_SCAN)	+= chip.o
 
-obj-$(CONFIG_TARGET_TURINGPI2)	+= ../turing/pi2/
+obj-$(CONFIG_TARGET_TURINGPI2)	+= ../tp2bmc/

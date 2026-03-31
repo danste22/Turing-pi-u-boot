@@ -14,7 +14,7 @@ obj-y += version.o
 # command
 obj-$(CONFIG_CMD_TPI_INFO) += tpi_info.o
 ifdef CONFIG_CMD_TPI_INFO
-	ccflags-y += -Iboard/turing/pi2/
+	ccflags-y += -Iboard/tp2bmc/
 endif
 obj-$(CONFIG_CMD_ARMFFA) += armffa.o
 obj-$(CONFIG_CMD_2048) += 2048.o
