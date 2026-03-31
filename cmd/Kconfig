@@ -1367,8 +1367,10 @@ config CMD_I3C
 
 config CMD_TPI_INFO
 	bool "tpi_info"
+	depends on TARGET_TURINGPI2
+	depends on BLOBLIST
 	help
-	  helper tool to load spl handoff
+	  Read Turing Pi 2 board info from the SPL bloblist handoff.
 
 config CMD_W1
 	depends on W1

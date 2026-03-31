@@ -30,8 +30,6 @@
 #include <linux/compiler.h>
 #include <linux/delay.h>
 
-int tp_board_init(void);
-
 struct fel_stash {
 	uint32_t sp;
 	uint32_t lr;
@@ -471,6 +469,7 @@ u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 	return result;
 }
 
+#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
 static void go_to_fel(void)
 {
 	/* change lr to the well-known fel entry point */
@@ -481,7 +480,10 @@ static void go_to_fel(void)
 	return_to_fel(fel_stash.sp, fel_stash.lr);
 }
 
-/* If the bus hung due to a prior operation, clock out any residual bits */
+/*
+ * If the I2C bus hung due to a prior operation, clock out any residual
+ * bits (Turing Pi 2 board, TWI2 on PE12/PE13).
+ */
 void unblock_twi2_bus(void)
 {
 	unsigned int scl = SUNXI_GPE(12);
@@ -505,6 +507,10 @@ void unblock_twi2_bus(void)
 	gpio_set_value(sda, 1);
 }
 
+/* board/tp2bmc/turingpi2-spl.c */
+int tp_board_init(void);
+#endif
+
 void board_init_f(ulong dummy)
 {
 	sunxi_sram_init();
@@ -524,15 +530,19 @@ void board_init_f(ulong dummy)
 	preloader_console_init();
 
 #if CONFIG_IS_ENABLED(I2C) && CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
+#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
 	unblock_twi2_bus();
+#endif
 	/* Needed early by sunxi_board_init if PMU is enabled */
 	i2c_init_board();
 	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
 
 	sunxi_board_init();
+#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
 	if (tp_board_init() == 1)
 		go_to_fel();
+#endif
 }
 #endif /* CONFIG_XPL_BUILD */
 

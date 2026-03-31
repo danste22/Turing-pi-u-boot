@@ -165,10 +165,6 @@ int env_set(const char *varname, const char *value);
  *
  * Same as env_set() but passes H_FORCE to permit changing variables that are
  * otherwise read-only (e.g. ethaddr after import).
- *
- * @varname: Variable to adjust
- * @varvalue: Value to set
- * Return: 0 if OK, 1 on error
  */
 int env_set_force(const char *varname, const char *varvalue);
 

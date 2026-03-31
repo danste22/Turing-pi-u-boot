@@ -854,10 +854,36 @@ int misc_init_r(void)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
+/*
+ * If no valid MAC is in the environment yet, copy from sid_eth (SID-derived)
+ * so Ethernet probe can use it. This replaces board-specific logic that
+ * previously lived in eth_post_probe().
+ */
+static void turingpi2_eth_env_from_sid(void)
+{
+	unsigned char env_mac[ARP_HLEN];
+	unsigned char sid_mac[ARP_HLEN];
+
+	eth_env_get_enetaddr_by_index("eth", 0, env_mac);
+	if (!is_zero_ethaddr(env_mac) && is_valid_ethaddr(env_mac))
+		return;
+
+	eth_env_get_enetaddr_by_index("sid_eth", 0, sid_mac);
+	if (!is_valid_ethaddr(sid_mac))
+		return;
+
+	eth_env_set_enetaddr_by_index("eth", 0, sid_mac);
+}
+#endif
+
 int board_late_init(void)
 {
 #ifdef CONFIG_USB_ETHER
 	usb_ether_init();
+#endif
+#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
+	turingpi2_eth_env_from_sid();
 #endif
 
 	return 0;
