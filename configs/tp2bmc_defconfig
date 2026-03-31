@@ -45,6 +45,9 @@ CONFIG_ENV_UBI_PART="ubi"
 CONFIG_ENV_UBI_VOLUME="uboot-env"
 # Match Linux UBI on SPI NAND (dmesg: VID header offset 2048, data offset 4096).
 CONFIG_UBI_DEFAULT_VID_OFFSET=2048
+# Redundant with UBI_DEFAULT for env-in-UBI; ensures attach works if one symbol
+# is missing from a merged Buildroot/custom .config.
+CONFIG_ENV_UBI_VID_OFFSET=2048
 CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG=y
 CONFIG_ENV_USE_DEFAULT_ENV_TEXT_FILE=y
 CONFIG_ENV_DEFAULT_ENV_TEXT_FILE="board/tp2bmc/uboot.env"
