@@ -469,47 +469,26 @@ u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 	return result;
 }
 
-#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
 static void go_to_fel(void)
 {
+#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
 	/* change lr to the well-known fel entry point */
 	fel_stash.lr &= ~0xFFFF;
 	fel_stash.lr |= 0x0020;
 
 	debug("Entering FEL sp=%x, lr=%x\n", fel_stash.sp, fel_stash.lr);
 	return_to_fel(fel_stash.sp, fel_stash.lr);
-}
-
-/*
- * If the I2C bus hung due to a prior operation, clock out any residual
- * bits (Turing Pi 2 board, TWI2 on PE12/PE13).
- */
-void unblock_twi2_bus(void)
-{
-	unsigned int scl = SUNXI_GPE(12);
-	unsigned int sda = SUNXI_GPE(13);
-	int i;
-
-	gpio_direction_output(scl, 0);
-	gpio_direction_output(sda, 0);
-
-	for (i = 0; i < 9; i++) {
-		gpio_set_value(scl, 0);
-		udelay(5);
-		gpio_set_value(scl, 1);
-		udelay(5);
-	}
-	gpio_set_value(scl, 0);
-	udelay(5);
-	udelay(5);
-	gpio_set_value(scl, 1);
-	udelay(5);
-	gpio_set_value(sda, 1);
-}
-
-/* board/tp2bmc/turingpi2-spl.c */
-int tp_board_init(void);
 #endif
+}
+
+__weak void sunxi_board_i2c_early_fixup(void)
+{
+}
+
+__weak bool sunxi_board_should_enter_fel(void)
+{
+	return false;
+}
 
 void board_init_f(ulong dummy)
 {
@@ -530,19 +509,15 @@ void board_init_f(ulong dummy)
 	preloader_console_init();
 
 #if CONFIG_IS_ENABLED(I2C) && CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
-#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
-	unblock_twi2_bus();
-#endif
+	sunxi_board_i2c_early_fixup();
 	/* Needed early by sunxi_board_init if PMU is enabled */
 	i2c_init_board();
 	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
 
 	sunxi_board_init();
-#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
-	if (tp_board_init() == 1)
+	if (sunxi_board_should_enter_fel())
 		go_to_fel();
-#endif
 }
 #endif /* CONFIG_XPL_BUILD */
 

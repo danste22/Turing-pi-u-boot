@@ -13,6 +13,7 @@
 #include <dm.h>
 #include <i2c.h>
 #include <init.h>
+#include <stdbool.h>
 //#include <linux/errno.h>
 #include <linux/delay.h>
 //#include <log.h>
@@ -115,12 +116,13 @@ tpi_board_info *setup_bloblist(void) {
 }
 #endif
 
-int tp_board_init(void) {
+static bool tp_board_init(void)
+{
   u32 cookie = readl(TURING_PI2_BOOT_COOKIE_ADDR);
   if (cookie == TURING_PI2_BOOT_COOKIE_FEL) {
     writel(TURING_PI2_BOOT_COOKIE_WARM, TURING_PI2_BOOT_COOKIE_ADDR);
     // signal FEL
-    return 1;
+    return true;
   }
 
   tpi_board_info *info = NULL;
@@ -156,7 +158,36 @@ int tp_board_init(void) {
 #if CONFIG_IS_ENABLED(BLOBLIST)
   bloblist_finish();
 #endif
-  return 0;
+  return false;
+}
+
+void sunxi_board_i2c_early_fixup(void)
+{
+	unsigned int scl = SUNXI_GPE(12);
+	unsigned int sda = SUNXI_GPE(13);
+	int i;
+
+	gpio_direction_output(scl, 0);
+	gpio_direction_output(sda, 0);
+
+	for (i = 0; i < 9; i++) {
+		gpio_set_value(scl, 0);
+		udelay(5);
+		gpio_set_value(scl, 1);
+		udelay(5);
+	}
+
+	gpio_set_value(scl, 0);
+	udelay(5);
+	udelay(5);
+	gpio_set_value(scl, 1);
+	udelay(5);
+	gpio_set_value(sda, 1);
+}
+
+bool sunxi_board_should_enter_fel(void)
+{
+	return tp_board_init();
 }
 
 #if CONFIG_IS_ENABLED(OF_CONTROL)
