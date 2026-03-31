@@ -601,13 +601,27 @@ static int ubi_dev_scan(struct mtd_info *info, const char *vid_header_offset)
 	if (!vid_header_offset)
 		vid_header_offset = UBI_CMD_VID_STR(CONFIG_UBI_DEFAULT_VID_OFFSET);
 #endif
+	/* #region agent log */
+	printf("AGENTDBG aba911 H1 run=pre-fix location=cmd/ubi.c:ubi_dev_scan "
+	       "msg=scan_inputs mtd=%s vid_arg=%s\n",
+	       info ? info->name : "(null)",
+	       vid_header_offset ? vid_header_offset : "(null)");
+	/* #endregion */
 	if (!vid_header_offset)
 		sprintf(ubi_mtd_param_buffer, "%s", info->name);
 	else
 		sprintf(ubi_mtd_param_buffer, "%s,%s", info->name,
 			vid_header_offset);
+	/* #region agent log */
+	printf("AGENTDBG aba911 H3 run=pre-fix location=cmd/ubi.c:ubi_dev_scan "
+	       "msg=param_parse_input param=%s\n", ubi_mtd_param_buffer);
+	/* #endregion */
 
 	err = ubi_mtd_param_parse(ubi_mtd_param_buffer, NULL);
+	/* #region agent log */
+	printf("AGENTDBG aba911 H3 run=pre-fix location=cmd/ubi.c:ubi_dev_scan "
+	       "msg=param_parse_ret ret=%d\n", err);
+	/* #endregion */
 	if (err)
 		return -err;
 
@@ -685,6 +699,12 @@ int ubi_part(char *part_name, const char *vid_header_offset)
 	}
 
 	ubi_detach();
+	/* #region agent log */
+	printf("AGENTDBG aba911 H2 run=pre-fix location=cmd/ubi.c:ubi_part "
+	       "msg=part_request part=%s vid_arg=%s\n",
+	       part_name ? part_name : "(null)",
+	       vid_header_offset ? vid_header_offset : "(null)");
+	/* #endregion */
 
 	mtd_probe_devices();
 	mtd = get_mtd_device_nm(part_name);
@@ -695,6 +715,11 @@ int ubi_part(char *part_name, const char *vid_header_offset)
 	put_mtd_device(mtd);
 
 	err = ubi_dev_scan(mtd, vid_header_offset);
+	/* #region agent log */
+	printf("AGENTDBG aba911 H2 run=pre-fix location=cmd/ubi.c:ubi_part "
+	       "msg=dev_scan_ret ret=%d mtd=%s\n", err,
+	       mtd ? mtd->name : "(null)");
+	/* #endregion */
 	if (err) {
 		printf("UBI init error %d\n", err);
 		printf("Please check, if the correct MTD partition is used (size big enough?)\n");
