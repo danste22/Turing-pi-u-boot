@@ -32,6 +32,11 @@
 #undef ubi_msg
 #define ubi_msg(fmt, ...) printf("UBI: " fmt "\n", ##__VA_ARGS__)
 
+#if defined(CONFIG_ENV_UBI_VID_OFFSET) && CONFIG_ENV_UBI_VID_OFFSET > 0
+#define UBI_CMD_VID_STR1(x) #x
+#define UBI_CMD_VID_STR(x) UBI_CMD_VID_STR1(x)
+#endif
+
 /* Private own data */
 static struct ubi_device *ubi;
 
@@ -592,6 +597,10 @@ static int ubi_dev_scan(struct mtd_info *info, const char *vid_header_offset)
 	char ubi_mtd_param_buffer[80];
 	int err;
 
+#if defined(CONFIG_ENV_UBI_VID_OFFSET) && CONFIG_ENV_UBI_VID_OFFSET > 0
+	if (!vid_header_offset)
+		vid_header_offset = UBI_CMD_VID_STR(CONFIG_ENV_UBI_VID_OFFSET);
+#endif
 	if (!vid_header_offset)
 		sprintf(ubi_mtd_param_buffer, "%s", info->name);
 	else
