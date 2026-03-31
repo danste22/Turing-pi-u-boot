@@ -11,9 +11,12 @@
 #include <bloblist.h>
 #include <board_info.h>
 #include <common.h>
+#include <dm.h>
 #include <i2c.h>
 #include <init.h>
+#include <linux/delay.h>
 #include <sunxi_gpio.h>
+#include <u-boot/crc.h>
 
 #define TURING_PI2_LATCH_STATE_ADDR 0x0709010c
 #define TURING_PI2_BOOT_COOKIE_ADDR 0x07090108
@@ -56,15 +59,33 @@ static void init_latches(u16 tpi_version) {
 }
 
 static int board_info_from_eeprom(tpi_board_info *info) {
-  uint chip = 0x50;
+#if CONFIG_IS_ENABLED(DM_I2C)
+  struct udevice *dev;
+  int res;
+
+  res = i2c_get_chip_for_busnum(0, CONFIG_SYS_I2C_EEPROM_ADDR, 1, &dev);
+  if (res) {
+    printf("Error: EEPROM chip %d\n", res);
+    return res;
+  }
+  res = dm_i2c_read(dev, 0, (uint8_t *)info, sizeof(tpi_board_info));
+  if (res) {
+    printf("Error: reading EEPROM %d\n", res);
+    return res;
+  }
+  return 0;
+#else
+  uint chip = CONFIG_SYS_I2C_EEPROM_ADDR;
   uint addr = 0;
   int res = i2c_read(chip, addr, 1, (uint8_t *)info, sizeof(tpi_board_info));
+
   if (res) {
     printf("Error: reading EEPROM %d\n", res);
     return res;
   }
 
   return 0;
+#endif
 }
 
 u32 compute_crc(tpi_board_info *info) {

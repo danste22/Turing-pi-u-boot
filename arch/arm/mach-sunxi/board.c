@@ -28,6 +28,7 @@
 #include <asm/arch/mmc.h>
 
 #include <linux/compiler.h>
+#include <linux/delay.h>
 
 int tp_board_init(void);
 

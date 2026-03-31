@@ -1,0 +1,402 @@
+// SPDX-License-Identifier: GPL-2.0+
+// Copyright (C) 2023-2024 Sam Edwards <CFSworks@gmail.com>
+
+/dts-v1/;
+
+#ifdef __ASSEMBLY__
+#define IS_UBOOT
+#endif
+
+#ifdef IS_UBOOT
+#include "sun8i-t113s.dtsi"
+#else
+#include "allwinner/sun8i-t113s.dtsi"
+#endif
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	compatible = "turing,pi2", "allwinner,sun8i-t113s";
+
+	aliases {
+		ethernet0 = &emac;
+		serial0 = &uart3;
+		serial1 = &uart2;
+		serial2 = &uart1;
+		serial3 = &uart4;
+		serial4 = &uart5;
+		flash0 = &flash0;
+	};
+
+	// The LEDs are actually GPIO lines that go to the front-panel LEDs.
+	leds {
+		compatible = "gpio-leds";
+
+		led-0 {
+			label = "fp::power";
+			gpios = <&pio 6 8 GPIO_ACTIVE_LOW>; /* PG8 */
+		};
+
+		led-1 {
+			label = "fp::status";
+			gpios = <&pio 6 9 GPIO_ACTIVE_LOW>; /* PG9 */
+		};
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		// Part of the front-panel connector
+		button-power {
+			label = "fp:power";
+			linux,code = <KEY_POWER>;
+			gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>; /* PG10 */
+		};
+
+		button-reset {
+			label = "fp:reset";
+			linux,code = <KEY_RESTART>;
+			gpios = <&pio 6 11 GPIO_ACTIVE_HIGH>; /* PG11 */
+		};
+
+		// Located on the board itself
+		key-1 {
+			label = "key1";
+			linux,code = <KEY_1>;
+			gpios = <&pio 6 15 GPIO_ACTIVE_LOW>; /* PG15 */
+		};
+	};
+
+	reg_atx_5vsb: regulator-5v {
+		compatible = "regulator-fixed";
+		regulator-name = "atx-5vsb";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-always-on;
+	};
+
+	reg_3v3: regulator-3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc-3v3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		vin-supply = <&reg_atx_5vsb>;
+	};
+
+	reg_1v8: regulator-1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc-1v8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		vin-supply = <&reg_atx_5vsb>;
+	};
+
+	reg_vcc_core: regulator-core {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc-core";
+		regulator-min-microvolt = <880000>;
+		regulator-max-microvolt = <880000>;
+		vin-supply = <&reg_atx_5vsb>;
+	};
+};
+
+&dcxo {
+	clock-frequency = <24000000>;
+};
+
+&cpu0 {
+	clock-frequency = <1008000000>;
+	cpu-supply = <&reg_vcc_core>;
+};
+
+&cpu1 {
+	clock-frequency = <1008000000>;
+	cpu-supply = <&reg_vcc_core>;
+};
+
+&pio {
+	vcc-pb-supply = <&reg_3v3>;
+	vcc-pc-supply = <&reg_3v3>;
+	vcc-pd-supply = <&reg_1v8>;
+	vcc-pe-supply = <&reg_3v3>;
+	vcc-pf-supply = <&reg_3v3>;
+	vcc-pg-supply = <&reg_3v3>;
+
+	i2c2_pe12_pins: i2c2-pe12-pins {
+		pins = "PE12", "PE13";
+		function = "i2c2";
+		drive-strength = <20>;
+	};
+
+	uart2_pd_pins: uart2-pd-pins {
+		pins = "PD1", "PD2";
+		function = "uart2";
+		bias-pull-up;
+	};
+
+	uart4_pb_pins: uart4-pb-pins {
+		pins = "PB2", "PB3";
+		function = "uart4";
+		bias-pull-up;
+	};
+
+	uart5_pb_pins: uart5-pb-pins {
+		pins = "PB4", "PB5";
+		function = "uart5";
+		bias-pull-up;
+	};
+};
+
+&mmc0 {
+	status = "okay";
+	vmmc-supply = <&reg_3v3>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&mmc0_pins>;
+
+	bus-width = <4>;
+	cd-gpios = <&pio 5 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>; /* PF6 */
+	no-sdio;
+};
+
+&uart1_pg6_pins {
+	bias-pull-up;
+};
+
+&uart1 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_pg6_pins>;
+};
+
+&uart2 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart2_pd_pins>;
+};
+
+&uart3_pb_pins {
+	bias-pull-up;
+};
+
+&uart3 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart3_pb_pins>;
+};
+
+&uart4 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart4_pb_pins>;
+};
+
+&uart5 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart5_pb_pins>;
+};
+
+&i2c2 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_pe12_pins>;
+
+	clock-frequency = <100000>;
+
+	eeprom@50 {
+		compatible = "microchip,24c02", "atmel,24c02";
+		reg = <0x50>;
+		vcc-supply = <&reg_3v3>;
+		pagesize = <16>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		mac_address: mac-address@2c {
+			reg = <0x2c 0x06>;
+		};
+	};
+
+	ethernet_switch: ethernet-switch@5c {
+		compatible = "realtek,rtl8365mb";
+		reg = <0x5c>;
+
+		ethernet-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			ethernet-port@0 {
+				reg = <0>;
+				label = "node1";
+				phy-handle = <&ethphy0>;
+				phy-mode = "internal";
+			};
+			ethernet-port@1 {
+				reg = <1>;
+				label = "node2";
+				phy-handle = <&ethphy1>;
+				phy-mode = "internal";
+			};
+			ethernet-port@2 {
+				reg = <2>;
+				label = "node3";
+				phy-handle = <&ethphy2>;
+				phy-mode = "internal";
+			};
+			ethernet-port@3 {
+				reg = <3>;
+				label = "node4";
+				phy-handle = <&ethphy3>;
+				phy-mode = "internal";
+			};
+			ethernet-port@4 {
+				reg = <4>;
+				label = "cpu";
+				ethernet = <&emac>;
+				phy-handle = <&ethphy4>;
+				phy-mode = "internal";
+			};
+			ethernet-port@5 {
+				reg = <5>;
+				label = "ge0";
+				phy-handle = <&ethphy5>;
+				phy-mode = "internal";
+			};
+			ethernet-port@6 {
+				reg = <6>;
+				label = "ge1";
+				phy-handle = <&ethphy6>;
+				phy-mode = "internal";
+			};
+		};
+
+		mdio {
+			compatible = "realtek,smi-mdio";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			ethphy0: ethernet-phy@0 {
+				reg = <0>;
+			};
+			ethphy1: ethernet-phy@1 {
+				reg = <1>;
+			};
+			ethphy2: ethernet-phy@2 {
+				reg = <2>;
+			};
+			ethphy3: ethernet-phy@3 {
+				reg = <3>;
+			};
+			ethphy4: ethernet-phy@4 {
+				reg = <4>;
+			};
+			ethphy5: ethernet-phy@5 {
+				reg = <5>;
+			};
+			ethphy6: ethernet-phy@6 {
+				reg = <6>;
+			};
+		};
+	};
+};
+
+&emac {
+	status = "okay";
+	nvmem-cells = <&mac_address>;
+	nvmem-cell-names = "mac-address";
+	pinctrl-names = "default";
+	pinctrl-0 = <&rmii_pe_pins>;
+	phy-handle = <&rtl8201f>;
+	phy-mode = "rmii";
+	phy-supply = <&reg_3v3>;
+	allwinner,tx-delay-ps = <300>;
+	allwinner,rx-delay-ps = <0>;
+};
+
+&mdio {
+	rtl8201f: ethernet-phy@0 {
+		compatible = "ethernet-phy-ieee802.3-c22";
+		reg = <0>;
+		reset-gpios = <&pio 4 10 GPIO_ACTIVE_LOW>; /* PE10 */
+	};
+};
+
+&pio {
+	/omit-if-no-ref/
+	i2c0_pg_pins: i2c0-pg-pins {
+		pins = "PG12", "PG13";
+		function = "i2c0";
+	};
+
+	/omit-if-no-ref/
+	pwm5_pd_pin: pwm5-pd-pin {
+		pins = "PD21";
+		function = "pwm5";
+	};
+};
+
+&spi0_pins {
+	pins = "PC2", "PC3", "PC4", "PC5", "PC6", "PC7";
+};
+
+&spi0 {
+	status = "okay";
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&spi0_pins>;
+
+	flash0: flash@0 {
+		compatible = "spi-nand";
+		reg = <0x0>;
+
+		spi-max-frequency=<80000000>;
+#ifndef IS_UBOOT
+		spi-rx-bus-width=<4>;
+		spi-tx-bus-width=<4>;
+#endif
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "boot";
+				reg = <0x00000000 0x00100000>;
+			};
+
+			partition@100000 {
+				label = "ubi";
+				reg = <0x00100000 0x07f00000>;
+			};
+		};
+	};
+};
+
+&usb_otg {
+	dr_mode = "peripheral";
+	status = "okay";
+};
+
+&ehci1 {
+	status = "okay";
+};
+
+&ohci1 {
+	status = "okay";
+};
+
+&usbphy {
+	status = "okay";
+};
+
+&wdt {
+	status = "okay";
+};

@@ -159,7 +159,18 @@ bool env_get_autostart(void);
  * Return: 0 if OK, 1 on error
  */
 int env_set(const char *varname, const char *value);
-int env_set_force(const char *varname, const char *value);
+
+/**
+ * env_set_force() - set an environment variable, forcing overwrite of read-only
+ *
+ * Same as env_set() but passes H_FORCE to permit changing variables that are
+ * otherwise read-only (e.g. ethaddr after import).
+ *
+ * @varname: Variable to adjust
+ * @varvalue: Value to set
+ * Return: 0 if OK, 1 on error
+ */
+int env_set_force(const char *varname, const char *varvalue);
 
 /**
  * env_get_ulong() - Return an environment variable as an integer value
