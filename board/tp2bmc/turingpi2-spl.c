@@ -14,10 +14,8 @@
 #include <i2c.h>
 #include <init.h>
 #include <stdbool.h>
-//#include <linux/errno.h>
+#include <linux/byteorder/generic.h>
 #include <linux/delay.h>
-//#include <log.h>
-//#include <stdio.h>
 #include <sunxi_gpio.h>
 #include <u-boot/crc.h>
 
@@ -95,8 +93,8 @@ u32 compute_crc(tpi_board_info *info) {
   int info_offset = offsetof(tpi_board_info, hdr_version);
   u32 crc = crc32(0, (void *)info + info_offset,
                   sizeof(tpi_board_info) - info_offset);
-  return ((crc & 0x000000FF) << 24) | ((crc & 0x0000FF00) << 8) |
-         ((crc & 0x00FF0000) >> 8) | ((crc & 0xFF000000) >> 24);
+
+  return cpu_to_be32(crc);
 }
 
 #if CONFIG_IS_ENABLED(BLOBLIST)

@@ -11,6 +11,7 @@
 #include <board_info.h>
 #include <command.h>
 #include <env.h>
+#include <string.h>
 
 // Returns the semver version pointed to by `version_ptr` as a char*, prefixed
 // with 'v'. e.g. v2.5.1
@@ -141,6 +142,9 @@ int do_tpi_info(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[]) {
       return CMD_RET_FAILURE;
     }
   }
+
+  if (!env_name && strcmp(name, "all"))
+    env_name = name;
 
   int init_res = bloblist_maybe_init();
   if (init_res != 0) {
