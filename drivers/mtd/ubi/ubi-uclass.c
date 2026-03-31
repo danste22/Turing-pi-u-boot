@@ -121,6 +121,37 @@ static int ubi_post_bind(struct udevice *dev)
 	return 0;
 }
 
+int ubi_find_volume_dev(struct udevice *ubi_dev, const char *name,
+			struct udevice **vol_dev)
+{
+	struct udevice *tmp_dev;
+	int ret;
+
+	*vol_dev = NULL;
+
+	/* First try an exact child name match */
+	ret = device_find_child_by_name(ubi_dev, name, vol_dev);
+	if (!ret && *vol_dev)
+		return 0;
+
+	/*
+	 * blk_create_devicef() names children as "<parent>.<volume>"
+	 * (e.g. "ubi0.rootfs"). Fall back to matching on the suffix
+	 * after the last '.' so callers can pass bare volume names.
+	 */
+	device_foreach_child(tmp_dev, ubi_dev) {
+		const char *base = strrchr(tmp_dev->name, '.');
+
+		base = base ? base + 1 : tmp_dev->name;
+		if (!strcmp(base, name)) {
+			*vol_dev = tmp_dev;
+			return 0;
+		}
+	}
+
+	return -ENODEV;
+}
+
 int ubi_dm_bind(unsigned int index)
 {
 	struct udevice *dev;

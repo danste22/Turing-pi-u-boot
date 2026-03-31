@@ -56,6 +56,10 @@ extern int ubi_dm_bind(unsigned int);
 extern int ubi_dm_unbind_all(void);
 #endif
 
+struct udevice;
+int ubi_find_volume_dev(struct udevice *ubi_dev, const char *name,
+			struct udevice **vol_dev);
+
 extern struct ubi_device *ubi_devices[];
 int cmd_ubifs_mount(char *vol_name);
 int cmd_ubifs_umount(void);
