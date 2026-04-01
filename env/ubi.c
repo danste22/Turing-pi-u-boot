@@ -114,13 +114,6 @@ static int env_ubi_load(void)
 	ALLOC_CACHE_ALIGN_BUFFER(char, env2_buf, CONFIG_ENV_SIZE);
 	int read1_fail, read2_fail;
 	env_t *tmp_env1, *tmp_env2;
-	/* #region agent log */
-	printf("AGENTDBG aba911 H1 run=verify location=env/ubi.c:env_ubi_load "
-	       "msg=env_load_start part=%s vol=%s vid=%s\n",
-	       CONFIG_ENV_UBI_PART, CONFIG_ENV_UBI_VOLUME,
-	       UBI_VID_OFFSET ? UBI_VID_OFFSET : "(null)");
-	/* #endregion */
-
 	/*
 	 * In case we have restarted u-boot there is a chance that buffer
 	 * contains old environment (from the previous boot).
@@ -161,13 +154,6 @@ static int env_ubi_load(void)
 static int env_ubi_load(void)
 {
 	ALLOC_CACHE_ALIGN_BUFFER(char, buf, CONFIG_ENV_SIZE);
-	/* #region agent log */
-	printf("AGENTDBG aba911 H1 run=verify location=env/ubi.c:env_ubi_load "
-	       "msg=env_load_start part=%s vol=%s vid=%s\n",
-	       CONFIG_ENV_UBI_PART, CONFIG_ENV_UBI_VOLUME,
-	       UBI_VID_OFFSET ? UBI_VID_OFFSET : "(null)");
-	/* #endregion */
-
 	/*
 	 * In case we have restarted u-boot there is a chance that buffer
 	 * contains old environment (from the previous boot).

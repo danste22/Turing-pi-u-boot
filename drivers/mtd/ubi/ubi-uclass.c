@@ -109,16 +109,6 @@ static int ubi_post_bind(struct udevice *dev)
 		blksz = choose_blksz_for_volume(vol);
 		lba = DIV_ROUND_UP((unsigned long long)vol->used_bytes, blksz);
 
-		// #region agent log
-		printf("{\"sessionId\":\"aba911\",\"hypothesisId\":\"H4\","
-		       "\"location\":\"ubi-uclass.c:ubi_post_bind\",\"message\":"
-		       "\"static_blk\",\"data\":{\"name\":\"%s\",\"used_bytes\":%lld,"
-		       "\"reserved_pebs\":%u,\"usable_leb\":%d,\"lba\":%lu,\"blksz\":%u},"
-		       "\"timestamp\":0}\n",
-		       vol->name, (long long)vol->used_bytes, vol->reserved_pebs,
-		       vol->usable_leb_size, (unsigned long)lba, blksz);
-		// #endregion
-
 		pr_debug("UBI volume %d (\"%s\"): %lu blocks, %d bytes each\n",
 			 vol->vol_id, vol->name, lba, blksz);
 
