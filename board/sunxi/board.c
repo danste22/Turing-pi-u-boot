@@ -818,6 +818,10 @@ static void setup_environment(const void *fdt)
 	}
 }
 
+#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
+static void turingpi2_eth_env_apply(void);
+#endif
+
 int misc_init_r(void)
 {
 	const char *spl_dt_name;
@@ -851,10 +855,37 @@ int misc_init_r(void)
 
 	setup_environment(gd->fdt_blob);
 
+#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
+	turingpi2_eth_env_apply();
+#endif
+
 	return 0;
 }
 
 #if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
+/*
+ * EEPROM layout: tpi_board_info.mac @ 0x2c (see board/tp2bmc/board_info.h);
+ * same offset as DT eeprom@50 / mac-address@2c on Turing Pi 2.
+ */
+#define TPI_EEPROM_MAC_OFF 0x2c
+
+static int turingpi2_read_eeprom_mac(unsigned char *mac)
+{
+#if CONFIG_IS_ENABLED(DM_I2C)
+	struct udevice *dev;
+	int ret;
+
+	ret = i2c_get_chip_for_busnum(0, CONFIG_SYS_I2C_EEPROM_ADDR, 1, &dev);
+	if (ret)
+		return ret;
+
+	return dm_i2c_read(dev, TPI_EEPROM_MAC_OFF, mac, ARP_HLEN);
+#else
+	return i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, TPI_EEPROM_MAC_OFF, 1,
+		       mac, ARP_HLEN);
+#endif
+}
+
 /*
  * If no valid MAC is in the environment yet, copy from sid_eth (SID-derived)
  * so Ethernet probe can use it. This replaces board-specific logic that
@@ -875,15 +906,29 @@ static void turingpi2_eth_env_from_sid(void)
 
 	eth_env_set_enetaddr_by_index("eth", 0, sid_mac);
 }
+
+/*
+ * Prefer the factory MAC stored in EEPROM (same source Linux uses via DT
+ * nvmem) so ethaddr matches the OS and differs per board. Fall back to the
+ * SID-derived address only if EEPROM is unreadable or contains an invalid MAC.
+ */
+static void turingpi2_eth_env_apply(void)
+{
+	unsigned char mac[ARP_HLEN];
+
+	if (!turingpi2_read_eeprom_mac(mac) && is_valid_ethaddr(mac)) {
+		eth_env_set_enetaddr_by_index("eth", 0, mac);
+		return;
+	}
+
+	turingpi2_eth_env_from_sid();
+}
 #endif
 
 int board_late_init(void)
 {
 #ifdef CONFIG_USB_ETHER
 	usb_ether_init();
-#endif
-#if IS_ENABLED(CONFIG_TARGET_TURINGPI2)
-	turingpi2_eth_env_from_sid();
 #endif
 
 	return 0;
