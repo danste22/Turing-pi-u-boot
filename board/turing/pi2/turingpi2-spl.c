@@ -13,7 +13,19 @@
 #include <common.h>
 #include <i2c.h>
 #include <init.h>
+#include <linux/delay.h>
 #include <sunxi_gpio.h>
+#include <u-boot/crc.h>
+
+u32 compute_crc(tpi_board_info *info) {
+  int info_offset = offsetof(tpi_board_info, hdr_version);
+  u32 crc = crc32(0, (void *)info + info_offset,
+                  sizeof(tpi_board_info) - info_offset);
+  return ((crc & 0x000000FF) << 24) | ((crc & 0x0000FF00) << 8) |
+         ((crc & 0x00FF0000) >> 8) | ((crc & 0xFF000000) >> 24);
+}
+
+#ifdef CONFIG_SPL_BUILD
 
 #define TURING_PI2_LATCH_STATE_ADDR 0x0709010c
 #define TURING_PI2_BOOT_COOKIE_ADDR 0x07090108
@@ -65,14 +77,6 @@ static int board_info_from_eeprom(tpi_board_info *info) {
   }
 
   return 0;
-}
-
-u32 compute_crc(tpi_board_info *info) {
-  int info_offset = offsetof(tpi_board_info, hdr_version);
-  u32 crc = crc32(0, (void *)info + info_offset,
-                  sizeof(tpi_board_info) - info_offset);
-  return ((crc & 0x000000FF) << 24) | ((crc & 0x0000FF00) << 8) |
-         ((crc & 0x00FF0000) >> 8) | ((crc & 0xFF000000) >> 24);
 }
 
 #if CONFIG_IS_ENABLED(BLOBLIST)
@@ -135,6 +139,7 @@ int tp_board_init(void) {
 #endif
   return 0;
 }
+#endif /* CONFIG_SPL_BUILD */
 
 #if CONFIG_IS_ENABLED(OF_CONTROL)
 /// This method determines which device tree to load. The main

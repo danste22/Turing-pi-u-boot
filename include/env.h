@@ -164,7 +164,8 @@ int env_set(const char *varname, const char *value);
  * env_set_force() - set an environment variable, bypassing write protection
  *
  * Like env_set(), but uses H_FORCE so that variables marked read-only in
- * env_flags can still be written.
+ * env_flags can still be written. Used by eth_env_set_enetaddr() to set
+ * MAC address variables that the platform marks as read-only.
  *
  * @varname: Variable to adjust
  * @value: Value to set, or NULL/"" to delete the variable

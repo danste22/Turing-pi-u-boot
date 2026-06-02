@@ -827,6 +827,12 @@ static void setup_environment(const void *fdt)
 	}
 }
 
+#ifdef CONFIG_TARGET_TURINGPI2
+int turingpi2_ethsw_isolate(void);
+int turingpi2_mac_apply_late(void);
+int turingpi2_mac_apply_fdt(void *fdt);
+#endif
+
 int misc_init_r(void)
 {
 	const char *spl_dt_name;
@@ -870,6 +876,10 @@ int board_late_init(void)
 {
 #ifdef CONFIG_USB_ETHER
 	usb_ether_init();
+#endif
+#ifdef CONFIG_TARGET_TURINGPI2
+	turingpi2_ethsw_isolate();
+	turingpi2_mac_apply_late();
 #endif
 
 	return 0;
@@ -939,6 +949,9 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	 */
 	setup_environment(blob);
 	fdt_fixup_ethernet(blob);
+#ifdef CONFIG_TARGET_TURINGPI2
+	turingpi2_mac_apply_fdt(blob);
+#endif
 
 	bluetooth_dt_fixup(blob);
 	board_dt_fixup(blob);
