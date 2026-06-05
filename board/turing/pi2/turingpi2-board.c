@@ -23,7 +23,6 @@
 #include <linux/libfdt.h>
 #include <linux/string.h>
 #include <mapmem.h>
-#include <mtd.h>
 #include <stdbool.h>
 #include <net.h>
 #include <sunxi_gpio.h>
@@ -260,22 +259,6 @@ int turingpi2_mac_apply_fdt(void *fdt)
 	return 0;
 }
 
-static bool turingpi2_nand_is_256mb(void)
-{
-	struct mtd_info *mtd;
-	bool large = false;
-
-	mtd = get_mtd_device_nm("spi-nand0");
-	if (IS_ERR_OR_NULL(mtd))
-		return false;
-
-	if (mtd->size > (128ULL * 1024 * 1024))
-		large = true;
-
-	put_mtd_device(mtd);
-	return large;
-}
-
 void turingpi2_set_fit_config_env(void)
 {
 	u16 hw = turingpi2_hw_version();
@@ -283,8 +266,7 @@ void turingpi2_set_fit_config_env(void)
 	char ver[12];
 
 	if (hw >= TP_VER(2, 5, 2))
-		fit_config = turingpi2_nand_is_256mb() ?
-			     "config-v2.5.2" : "config-v2.5.2-nand128";
+		fit_config = "config-v2.5.2";
 	else if (hw >= TP_VER(2, 5, 1))
 		fit_config = "config-v2.5.1";
 	else if (hw >= TP_VER(2, 5, 0))
