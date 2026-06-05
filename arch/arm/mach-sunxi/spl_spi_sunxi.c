@@ -14,19 +14,6 @@
 #include <linux/libfdt.h>
 #include <sunxi_gpio.h>
 
-/* Board may override SPI NAND raw load and NOR fallback (see board/turing/pi2). */
-__weak bool spl_board_spi_nand_allow_raw(void) { return false; }
-__weak bool spl_board_spi_use_nor_fallback(void) { return true; }
-
-/*
- * Binman pads SPL to CONFIG_SYS_SPI_U_BOOT_OFFS; U-Boot/FIT stays at that
- * offset even when sunxi_get_spl_size() reports a larger eGON length.
- */
-__weak uint32_t spl_board_spi_uboot_offset(uint32_t computed)
-{
-	return computed;
-}
-
 #ifdef CONFIG_SPL_OS_BOOT
 #error CONFIG_SPL_OS_BOOT is not supported yet
 #endif
@@ -113,6 +100,7 @@ __weak uint32_t spl_board_spi_uboot_offset(uint32_t computed)
 #define SPI0_CLK_DIV_BY_2           0x1000
 #define SPI0_CLK_DIV_BY_4           0x1001
 #define SPI0_CLK_DIV_BY_32          0x100f
+#define SUNXI_SPL_SPI_MAX_ATTEMPTS  3
 
 /*****************************************************************************/
 
@@ -486,10 +474,6 @@ static int spl_spi_try_load(struct spl_image_info *spl_image,
 	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) &&
 	    image_get_magic(header) == FDT_MAGIC) {
 		debug("Found FIT image\n");
-		/*
-		 * FIT external data uses linear SPI byte addresses (NOR 03h),
-		 * not SPI-NAND page/column reads.
-		 */
 		spl_load_init(load, spi_load_read_nor, NULL, 1);
 		ret = spl_load_simple_fit(spl_image, load, offset, header);
 	} else {
@@ -511,29 +495,35 @@ static int spl_spi_try_load(struct spl_image_info *spl_image,
 static int spl_spi_load_image(struct spl_image_info *spl_image,
 			      struct spl_boot_device *bootdev)
 {
+	int attempt;
 	int ret = 0;
 	uint32_t load_offset = sunxi_get_spl_size();
 	struct spl_load_info load;
 
 	load_offset = max_t(uint32_t, load_offset, CONFIG_SYS_SPI_U_BOOT_OFFS);
-	load_offset = spl_board_spi_uboot_offset(load_offset);
 
 	spl_load_init(&load, NULL, NULL, 1);
-	spi0_init();
+
+	for (attempt = 1; attempt <= SUNXI_SPL_SPI_MAX_ATTEMPTS; attempt++) {
+		spi0_init();
 
 #if defined(CONFIG_SPL_SPI_SUNXI_NAND)
-	spi0_nand_reset();
-	spl_load_init(&load, spi_load_read_nand, NULL, 1);
-	ret = spl_spi_try_load(spl_image, bootdev, &load, load_offset,
-			       spl_board_spi_nand_allow_raw());
-	if (!ret)
-		goto out;
+		spi0_nand_reset();
+		load.read = spi_load_read_nand;
+		ret = spl_spi_try_load(spl_image, bootdev, &load, load_offset, false);
+		if (!ret)
+			goto out;
 #endif
 
-	if (spl_board_spi_use_nor_fallback()) {
-		spl_load_init(&load, spi_load_read_nor, NULL, 1);
-		ret = spl_spi_try_load(spl_image, bootdev, &load, load_offset,
-				       true);
+		load.read = spi_load_read_nor;
+		ret = spl_spi_try_load(spl_image, bootdev, &load, load_offset, true);
+		if (!ret)
+			goto out;
+
+		spi0_deinit();
+		debug("sunxi SPI: load attempt %d/%d failed (%d)\n", attempt,
+		      SUNXI_SPL_SPI_MAX_ATTEMPTS, ret);
+		udelay(10);
 	}
 
 out:
