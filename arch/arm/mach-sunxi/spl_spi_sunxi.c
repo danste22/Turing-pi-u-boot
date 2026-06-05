@@ -100,6 +100,7 @@
 #define SPI0_CLK_DIV_BY_2           0x1000
 #define SPI0_CLK_DIV_BY_4           0x1001
 #define SPI0_CLK_DIV_BY_32          0x100f
+#define SUNXI_SPL_SPI_MAX_ATTEMPTS  3
 
 /*****************************************************************************/
 
@@ -492,29 +493,36 @@ static int spl_spi_try_load(struct spl_image_info *spl_image,
 static int spl_spi_load_image(struct spl_image_info *spl_image,
 			      struct spl_boot_device *bootdev)
 {
+	int attempt;
 	int ret = 0;
 	uint32_t load_offset = sunxi_get_spl_size();
 	struct spl_load_info load;
 
 	load_offset = max_t(uint32_t, load_offset, CONFIG_SYS_SPI_U_BOOT_OFFS);
 
-	load.dev = NULL;
-	load.priv = NULL;
-	load.filename = NULL;
-	load.bl_len = 1;
+	spl_load_init(&load, NULL, NULL, 1);
 
-	spi0_init();
+	for (attempt = 1; attempt <= SUNXI_SPL_SPI_MAX_ATTEMPTS; attempt++) {
+		spi0_init();
 
 #if defined(CONFIG_SPL_SPI_SUNXI_NAND)
-	spi0_nand_reset();
-	load.read = spi_load_read_nand;
-	ret = spl_spi_try_load(spl_image, bootdev, &load, load_offset, false);
-	if (!ret)
-		goto out;
+		spi0_nand_reset();
+		load.read = spi_load_read_nand;
+		ret = spl_spi_try_load(spl_image, bootdev, &load, load_offset, false);
+		if (!ret)
+			goto out;
 #endif
 
-	load.read = spi_load_read_nor;
-	ret = spl_spi_try_load(spl_image, bootdev, &load, load_offset, true);
+		load.read = spi_load_read_nor;
+		ret = spl_spi_try_load(spl_image, bootdev, &load, load_offset, true);
+		if (!ret)
+			goto out;
+
+		spi0_deinit();
+		debug("sunxi SPI: load attempt %d/%d failed (%d)\n", attempt,
+		      SUNXI_SPL_SPI_MAX_ATTEMPTS, ret);
+		udelay(10);
+	}
 
 out:
 	spi0_deinit();

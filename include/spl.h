@@ -286,7 +286,8 @@ struct spl_image_info {
 	u8 os;
 	ulong load_addr;
 	ulong entry_point;
-#if CONFIG_IS_ENABLED(LOAD_FIT) || CONFIG_IS_ENABLED(LOAD_FIT_FULL)
+#if CONFIG_IS_ENABLED(LOAD_FIT) || CONFIG_IS_ENABLED(LOAD_FIT_FULL) || \
+	CONFIG_IS_ENABLED(SPL_LOAD_FIT)
 	void *fdt_addr;
 #endif
 #if defined(CONFIG_BOOTM_OPTEE) && defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
@@ -318,7 +319,8 @@ typedef void __noreturn (*spl_jump_to_image_t)(struct spl_image_info *);
 
 static inline void *spl_image_fdt_addr(struct spl_image_info *info)
 {
-#if CONFIG_IS_ENABLED(LOAD_FIT) || CONFIG_IS_ENABLED(LOAD_FIT_FULL)
+#if CONFIG_IS_ENABLED(LOAD_FIT) || CONFIG_IS_ENABLED(LOAD_FIT_FULL) || \
+	CONFIG_IS_ENABLED(SPL_LOAD_FIT)
 	return info->fdt_addr;
 #else
 	return 0;

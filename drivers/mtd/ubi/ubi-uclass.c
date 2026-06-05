@@ -7,8 +7,8 @@
 
 #define LOG_CATEGORY UCLASS_UBI
 
-#include <common.h>
 #include <blk.h>
+#include <log.h>
 #include <dm.h>
 #include <dm/device-internal.h>
 #include <ubi_uboot.h>
@@ -113,13 +113,42 @@ static int ubi_post_bind(struct udevice *dev)
 		pr_debug("UBI volume %d (\"%s\"): %lu blocks, %d bytes each\n",
 			 vol->vol_id, vol->name, lba, blksz);
 
-		ret = blk_create_device(dev, "ubi_block", vol->name, UCLASS_UBI,
-					vol->vol_id, blksz, lba, &blkdev);
+		ret = blk_create_devicef(dev, "ubi_block", vol->name, UCLASS_UBI,
+				       vol->vol_id, blksz, lba, &blkdev);
 		if (ret)
 			return ret;
 	}
 
 	return 0;
+}
+
+int ubi_find_volume_dev(struct udevice *ubi_dev, const char *name,
+			struct udevice **vol_dev)
+{
+	struct udevice *tmp_dev;
+	int ret;
+
+	*vol_dev = NULL;
+
+	ret = device_find_child_by_name(ubi_dev, name, vol_dev);
+	if (!ret && *vol_dev)
+		return 0;
+
+	/*
+	 * blk_create_devicef() names children as "<parent>.<volume>"
+	 * (e.g. "ubi0.rootfs"). Match bare volume names on the suffix.
+	 */
+	device_foreach_child(tmp_dev, ubi_dev) {
+		const char *base = strrchr(tmp_dev->name, '.');
+
+		base = base ? base + 1 : tmp_dev->name;
+		if (!strcmp(base, name)) {
+			*vol_dev = tmp_dev;
+			return 0;
+		}
+	}
+
+	return -ENODEV;
 }
 
 int ubi_dm_bind(unsigned int index)

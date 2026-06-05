@@ -878,8 +878,11 @@ int board_late_init(void)
 	usb_ether_init();
 #endif
 #ifdef CONFIG_TARGET_TURINGPI2
+void turingpi2_set_fit_config_env(void);
+
 	turingpi2_ethsw_isolate();
 	turingpi2_mac_apply_late();
+	turingpi2_set_fit_config_env();
 #endif
 
 	return 0;
@@ -965,6 +968,7 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 }
 
 #ifdef CONFIG_SPL_LOAD_FIT
+#ifndef CONFIG_TARGET_TURINGPI2
 static void set_spl_dt_name(const char *name)
 {
 	struct boot_file_head *spl = get_spl_header(SPL_ENV_HEADER_VERSION);
@@ -1032,4 +1036,5 @@ int board_fit_config_name_match(const char *name)
 
 	return ret;
 }
+#endif /* !CONFIG_TARGET_TURINGPI2 */
 #endif /* CONFIG_SPL_LOAD_FIT */

@@ -30,7 +30,10 @@
 #include <linux/compiler.h>
 #include <linux/delay.h>
 
+#if defined(CONFIG_TARGET_TURINGPI2)
+void unblock_twi2_bus(void);
 int tp_board_init(void);
+#endif
 
 struct fel_stash {
 	uint32_t sp;
@@ -482,28 +485,6 @@ u32 spl_mmc_boot_mode(struct mmc *mmc, const u32 boot_device)
 	return result;
 }
 
-// In the event the bus hanged because of prior operation, clock out any
-// residual operations.
-void unblock_twi2_bus(void) {
-    unsigned SCL = SUNXI_GPE(12);
-    unsigned SDA = SUNXI_GPE(13);
-    gpio_direction_output(SCL, 0);
-    gpio_direction_output(SDA, 0);
-
-    for(int i=0; i < 9; ++i) {
-        gpio_set_value(SCL, 0);
-        udelay(5);
-        gpio_set_value(SCL, 1);
-        udelay(5);
-    }
-    gpio_set_value(SCL, 0);
-    udelay(5);
-    udelay(5);
-    gpio_set_value(SCL, 1);
-    udelay(5);
-    gpio_set_value(SDA, 1);
-}
-
 void board_init_f(ulong dummy)
 {
 	sunxi_sram_init();
@@ -522,19 +503,48 @@ void board_init_f(ulong dummy)
 	spl_init();
 	preloader_console_init();
 
-#if CONFIG_IS_ENABLED(I2C) && CONFIG_IS_ENABLED(SYS_I2C_LEGACY)
-    unblock_twi2_bus();
+#if CONFIG_IS_ENABLED(SPL_I2C) && (CONFIG_IS_ENABLED(SYS_I2C_LEGACY) || \
+    CONFIG_IS_ENABLED(SPL_SYS_I2C_LEGACY)) && \
+    !defined(CONFIG_TARGET_TURINGPI2)
 	/* Needed early by sunxi_board_init if PMU is enabled */
 	i2c_init_board();
 	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
 #endif
 
 	sunxi_board_init();
-    if (tp_board_init() == 1) {
-        go_to_fel();
-    }
+
+#if defined(CONFIG_TARGET_TURINGPI2)
+	unblock_twi2_bus();
+	if (tp_board_init() == 1)
+		go_to_fel();
+#endif
 }
 #endif /* CONFIG_XPL_BUILD */
+
+#if defined(CONFIG_TARGET_TURINGPI2)
+/* Clock out a hung TWI2 bus before EEPROM / switch access (TP2 PE12/PE13). */
+void unblock_twi2_bus(void)
+{
+	unsigned int scl = SUNXI_GPE(12);
+	unsigned int sda = SUNXI_GPE(13);
+
+	gpio_direction_output(scl, 0);
+	gpio_direction_output(sda, 0);
+
+	for (int i = 0; i < 9; ++i) {
+		gpio_set_value(scl, 0);
+		udelay(5);
+		gpio_set_value(scl, 1);
+		udelay(5);
+	}
+	gpio_set_value(scl, 0);
+	udelay(5);
+	udelay(5);
+	gpio_set_value(scl, 1);
+	udelay(5);
+	gpio_set_value(sda, 1);
+}
+#endif
 
 #if !CONFIG_IS_ENABLED(SYSRESET)
 void reset_cpu(void)

@@ -613,7 +613,9 @@ int acpi_i2c_of_to_plat(struct udevice *dev);
 void i2c_early_init_f(void);
 #endif
 
-#if !CONFIG_IS_ENABLED(DM_I2C)
+#if !CONFIG_IS_ENABLED(DM_I2C) || \
+	((defined(CONFIG_XPL_BUILD) || defined(CONFIG_SPL_BUILD)) && \
+	 CONFIG_IS_ENABLED(SPL_SYS_I2C_LEGACY))
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING

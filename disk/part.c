@@ -12,10 +12,12 @@
 #include <malloc.h>
 #include <part.h>
 #include <ubifs_uboot.h>
+#include <ubi_uboot.h>
 #include <dm.h>
 #include <dm/device-internal.h>
 #include <dm/uclass.h>
 #include <dm/uclass-internal.h>
+#include <string.h>
 
 #undef	PART_DEBUG
 
@@ -530,7 +532,8 @@ int blk_get_device_part_str(const char *ifname, const char *dev_part_str,
 					}
 				}
 			} else {
-				ret = device_find_child_by_name(ubi_dev, part_str, &vol_dev);
+				ret = ubi_find_volume_dev(ubi_dev, part_str,
+							  &vol_dev);
 			}
 
 			if (!vol_dev || ret) {

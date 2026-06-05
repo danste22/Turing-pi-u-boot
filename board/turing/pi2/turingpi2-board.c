@@ -6,17 +6,30 @@
  */
 
 #include <asm/gpio.h>
+#include <asm-generic/gpio.h>
 #include <bloblist.h>
 #include <board_info.h>
-#include <common.h>
+#include <boot_fit.h>
+#include <dm.h>
+#include <env.h>
+#include <image.h>
 #include <i2c.h>
+#include <asm-generic/global_data.h>
+#include <asm/sections.h>
+#include <serial.h>
+#include <linux/kernel.h>
+#include <linux/printk.h>
 #include <linux/delay.h>
 #include <linux/libfdt.h>
 #include <linux/string.h>
+#include <mapmem.h>
+#include <stdbool.h>
 #include <net.h>
 #include <sunxi_gpio.h>
 
-/* Hardware TWI2 is DM / legacy bus 0 on TP2 (see uboot.env). */
+DECLARE_GLOBAL_DATA_PTR;
+
+/* RTL8370MB on hardware TWI2 (PE12/PE13), sole enabled I2C bus (seq 0). */
 #define TURINGPI2_I2C_BUS		0
 #define RTL8365MB_I2C_ADDR		0x5c
 #define RTL8365MB_PORT_ISOLATION_BASE	0x08a2
@@ -35,16 +48,39 @@ static const char *const turingpi2_emac_compat[] = {
 };
 
 #if CONFIG_IS_ENABLED(BLOBLIST)
-static u16 turingpi2_hw_version(void)
+static tpi_board_info cached_info;
+static bool cached_info_ready;
+
+static const tpi_board_info *turingpi2_board_info_get(void)
 {
 	tpi_board_info *info;
 	int ret;
 
-	ret = bloblist_maybe_init();
-	if (ret)
-		return TP_VER(2, 4, 0);
+	if (cached_info_ready)
+		return &cached_info;
 
-	info = bloblist_find(BLOBLISTT_U_BOOT_SPL_HANDOFF, 0);
+	ret = bloblist_maybe_init();
+	if (!ret) {
+		info = bloblist_find(BLOBLISTT_U_BOOT_SPL_HANDOFF, 0);
+		if (turingpi2_board_info_valid(info, info ? 0 : -ENOENT)) {
+			cached_info = *info;
+			cached_info_ready = true;
+			return &cached_info;
+		}
+	}
+
+	if (!turingpi2_board_info_read(&cached_info)) {
+		cached_info_ready = true;
+		return &cached_info;
+	}
+
+	return NULL;
+}
+
+static u16 turingpi2_hw_version(void)
+{
+	const tpi_board_info *info = turingpi2_board_info_get();
+
 	if (!info)
 		return TP_VER(2, 4, 0);
 
@@ -53,14 +89,8 @@ static u16 turingpi2_hw_version(void)
 
 static bool turingpi2_mac_from_bloblist(u8 *mac)
 {
-	tpi_board_info *info;
-	int ret;
+	const tpi_board_info *info = turingpi2_board_info_get();
 
-	ret = bloblist_maybe_init();
-	if (ret)
-		return false;
-
-	info = bloblist_find(BLOBLISTT_U_BOOT_SPL_HANDOFF, 0);
 	if (!info)
 		return false;
 
@@ -69,7 +99,7 @@ static bool turingpi2_mac_from_bloblist(u8 *mac)
 		return false;
 
 	if (compute_crc(info) != info->crc32)
-		printf("BMC MAC: SPL handoff CRC mismatch\n");
+		printf("BMC MAC: board info CRC mismatch\n");
 
 	return true;
 }
@@ -91,36 +121,72 @@ static bool turingpi2_mac_read(u8 *mac)
 
 static void turingpi2_ethsw_reset_release(u16 hw_version)
 {
-	unsigned int pin = (hw_version < TP_VER(2, 5, 0)) ?
-			   SUNXI_GPG(13) : SUNXI_GPG(3);
+	const char *gpio_name = (hw_version < TP_VER(2, 5, 0)) ? "PG13" : "PG3";
+	struct gpio_desc reset_gpio;
+	int ret;
 
 	/* SPL asserts active-low reset; float the line to deassert. */
-	gpio_direction_input(pin);
+	ret = dm_gpio_lookup_name(gpio_name, &reset_gpio);
+	if (ret)
+		goto fallback;
+
+	ret = dm_gpio_request(&reset_gpio, "ethsw-reset");
+	if (ret)
+		goto fallback;
+
+	dm_gpio_set_dir_flags(&reset_gpio, GPIOD_IS_IN);
+	dm_gpio_free(reset_gpio.dev, &reset_gpio);
+	mdelay(150);
+	return;
+
+fallback:
+	/* Pre-DM fallback for boards without gpio lookup names. */
+	gpio_direction_input((hw_version < TP_VER(2, 5, 0)) ?
+			     SUNXI_GPG(13) : SUNXI_GPG(3));
 	mdelay(150);
 }
 
 #if CONFIG_IS_ENABLED(DM_I2C)
-static int turingpi2_rtk_reg_write(u16 reg, u16 val)
+static int turingpi2_rtk_chip(struct udevice **devp)
 {
-	struct udevice *dev;
-	u8 data[2];
+	struct udevice *bus;
 	int ret;
 
-	ret = i2c_get_chip_for_busnum(TURINGPI2_I2C_BUS, RTL8365MB_I2C_ADDR,
-				      2, &dev);
+	ret = uclass_get_device_by_seq(UCLASS_I2C, TURINGPI2_I2C_BUS, &bus);
 	if (ret)
 		return ret;
 
-	data[0] = val & 0xff;
-	data[1] = val >> 8;
+	/*
+	 * RTL8365MB SMI does not ACK a normal probe transaction; bind the
+	 * chip from the DT without i2c_probe_chip().
+	 */
+	return i2c_get_chip(bus, RTL8365MB_I2C_ADDR, 1, devp);
+}
 
-	return dm_i2c_write(dev, reg, data, sizeof(data));
+static int turingpi2_rtk_reg_write(struct udevice *dev, u16 reg, u16 val)
+{
+	struct i2c_msg msg;
+	u8 buf[4];
+
+	/* Match Linux realtek-smi-i2c: one write, reg/le16 + val/le16. */
+	buf[0] = reg & 0xff;
+	buf[1] = reg >> 8;
+	buf[2] = val & 0xff;
+	buf[3] = val >> 8;
+
+	msg.addr = RTL8365MB_I2C_ADDR;
+	msg.flags = 0;
+	msg.len = sizeof(buf);
+	msg.buf = buf;
+
+	return dm_i2c_xfer(dev, &msg, 1);
 }
 #endif
 
 int turingpi2_ethsw_isolate(void)
 {
 	u16 hw_version = turingpi2_hw_version();
+	struct udevice *rtk;
 	int port, ret, failures = 0;
 
 	turingpi2_ethsw_reset_release(hw_version);
@@ -128,8 +194,15 @@ int turingpi2_ethsw_isolate(void)
 #if !CONFIG_IS_ENABLED(DM_I2C)
 	return 0;
 #else
+	ret = turingpi2_rtk_chip(&rtk);
+	if (ret) {
+		printf("BMC ethsw: switch not found (err=%d)\n", ret);
+		return 0;
+	}
+
 	for (port = 0; port < ARRAY_SIZE(turingpi2_ethsw_isolation); port++) {
 		ret = turingpi2_rtk_reg_write(
+			rtk,
 			RTL8365MB_PORT_ISOLATION_BASE + port,
 			turingpi2_ethsw_isolation[port]);
 		if (ret)
@@ -185,3 +258,57 @@ int turingpi2_mac_apply_fdt(void *fdt)
 	turingpi2_emac_set_fdt_mac(fdt, mac);
 	return 0;
 }
+
+void turingpi2_set_fit_config_env(void)
+{
+	u16 hw = turingpi2_hw_version();
+	const char *fit_config;
+	char ver[12];
+
+	if (hw >= TP_VER(2, 5, 2))
+		fit_config = "config-v2.5.2";
+	else if (hw >= TP_VER(2, 5, 1))
+		fit_config = "config-v2.5.1";
+	else if (hw >= TP_VER(2, 5, 0))
+		fit_config = "config-v2.5.0";
+	else
+		fit_config = "config-v2.4.0";
+
+	snprintf(ver, sizeof(ver), "v%d.%d.%d", hw >> 11,
+		 (hw >> 6) & 0x1F, hw & 0x3F);
+	env_set("tpi_fit_config", fit_config);
+	printf("FIT config %s (EEPROM %s)\n", fit_config, ver);
+}
+
+#if CONFIG_IS_ENABLED(OF_SEPARATE) && CONFIG_IS_ENABLED(OF_BOARD) && \
+	CONFIG_IS_ENABLED(MULTI_DTB_FIT)
+int board_fdt_blob_setup(void **fdtp)
+{
+	void *stash = map_sysmem(TPI2_SPL_FDT_ADDR, 0);
+	void *fit, *dtb;
+
+	if (!fdt_check_header(stash)) {
+		*fdtp = stash;
+		return 0;
+	}
+
+	if (!fit_check_format(stash, IMAGE_SIZE_INVAL)) {
+		dtb = locate_dtb_in_fit(stash);
+		if (dtb) {
+			*fdtp = dtb;
+			return 0;
+		}
+	}
+
+	fit = (void *)_end;
+	if (!fit_check_format(fit, IMAGE_SIZE_INVAL)) {
+		dtb = locate_dtb_in_fit(fit);
+		if (dtb) {
+			*fdtp = dtb;
+			return 0;
+		}
+	}
+
+	return -EEXIST;
+}
+#endif

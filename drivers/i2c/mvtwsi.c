@@ -29,7 +29,13 @@ DECLARE_GLOBAL_DATA_PTR;
  * settings
  */
 
-#if !CONFIG_IS_ENABLED(DM_I2C)
+#if !CONFIG_IS_ENABLED(DM_I2C) || \
+	((defined(CONFIG_XPL_BUILD) || defined(CONFIG_SPL_BUILD)) && \
+	 CONFIG_IS_ENABLED(SPL_SYS_I2C_LEGACY))
+#define MVTWSI_USE_LEGACY_I2C
+#endif
+
+#if defined(MVTWSI_USE_LEGACY_I2C)
 #if (defined(CONFIG_ARCH_KIRKWOOD) || defined(CONFIG_ARCH_MVEBU))
 #include <asm/arch/soc.h>
 #elif defined(CONFIG_ARCH_SUNXI)
@@ -37,7 +43,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #else
 #error Driver mvtwsi not supported by SoC or board
 #endif
-#endif /* CONFIG_DM_I2C */
+#endif /* MVTWSI_USE_LEGACY_I2C */
 
 /*
  * On SUNXI, we get CFG_SYS_TCLK from this include, so we want to
@@ -187,7 +193,7 @@ inline uint calc_tick(uint speed)
 	return (1000000000u / speed) + 100;
 }
 
-#if !CONFIG_IS_ENABLED(DM_I2C)
+#if defined(MVTWSI_USE_LEGACY_I2C)
 
 /*
  * twsi_get_base() - Get controller register base for specified adapter
@@ -519,11 +525,7 @@ static void __twsi_i2c_init(struct mvtwsi_registers *twsi, int speed,
 	writel(slaveadd, &twsi->slave_address);
 	writel(0, &twsi->xtnd_slave_addr);
 	/* Assert STOP, but don't care for the result */
-#if CONFIG_IS_ENABLED(DM_I2C)
-	(void) twsi_stop(twsi, calc_tick(*actual_speed));
-#else
-	(void) twsi_stop(twsi, 10000);
-#endif
+	(void) twsi_stop(twsi, calc_tick(tmp_speed));
 }
 
 /*
@@ -726,7 +728,7 @@ static int __twsi_i2c_write(struct mvtwsi_registers *twsi, uchar chip,
 	return status != 0 ? status : stop_status;
 }
 
-#if !CONFIG_IS_ENABLED(DM_I2C)
+#if defined(MVTWSI_USE_LEGACY_I2C)
 static void twsi_i2c_init(struct i2c_adapter *adap, int speed,
 			  int slaveadd)
 {
@@ -819,7 +821,47 @@ U_BOOT_I2C_ADAP_COMPLETE(twsi5, twsi_i2c_init, twsi_i2c_probe,
 			 CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE, 5)
 
 #endif
-#else /* CONFIG_DM_I2C */
+
+#if defined(CONFIG_ARCH_SUNXI) && defined(CFG_I2C_MVTWSI_BASE2)
+#include <asm/arch/clock.h>
+#include <sunxi_gpio.h>
+/*
+ * Direct TWI2 access for SPL board EEPROM. Sunxi selects DM_I2C for proper
+ * U-Boot, which disables the legacy ll_entry adapters; i2c_read() then talks
+ * to an uninitialized controller. This bypasses i2c_core entirely.
+ */
+int sunxi_mvtwsi_early_read(u8 chip, unsigned int addr, int alen,
+			    u8 *buffer, int len)
+{
+	struct mvtwsi_registers *twsi =
+		(struct mvtwsi_registers *)CFG_I2C_MVTWSI_BASE2;
+	u8 addr_bytes[4];
+	uint actual_speed;
+	uint tick;
+
+	if (!buffer || len <= 0)
+		return -EINVAL;
+
+#if defined(CONFIG_MACH_SUN8I_R528)
+	sunxi_gpio_set_cfgpin(SUNXI_GPE(12), SUN8I_R528_GPE_TWI2);
+	sunxi_gpio_set_cfgpin(SUNXI_GPE(13), SUN8I_R528_GPE_TWI2);
+	clock_twi_onoff(2, 1);
+#endif
+
+	addr_bytes[0] = (addr >> 0) & 0xFF;
+	addr_bytes[1] = (addr >> 8) & 0xFF;
+	addr_bytes[2] = (addr >> 16) & 0xFF;
+	addr_bytes[3] = (addr >> 24) & 0xFF;
+
+	__twsi_i2c_init(twsi, CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE,
+			&actual_speed);
+	tick = calc_tick(actual_speed);
+
+	return __twsi_i2c_read(twsi, chip, addr_bytes, alen, buffer, len, tick);
+}
+#endif /* CONFIG_ARCH_SUNXI && CFG_I2C_MVTWSI_BASE2 */
+
+#elif CONFIG_IS_ENABLED(DM_I2C)
 
 static int mvtwsi_i2c_probe_chip(struct udevice *bus, u32 chip_addr,
 				 u32 chip_flags)
